@@ -47,6 +47,12 @@ namespace ChessChallenge.Application
                 {
                     return baseTimeMS;
                 }
+                // check if debugging and if so, return max time
+                if (System.Diagnostics.Debugger.IsAttached)
+                {
+                    return int.MaxValue;
+                }
+
                 return (int)Math.Round(Math.Max(0, baseTimeMS - secondsElapsed * 1000.0));
             }
         }
