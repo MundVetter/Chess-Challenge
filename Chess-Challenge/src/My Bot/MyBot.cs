@@ -50,12 +50,14 @@ public class MyBot : IChessBot
             // Get the board state after the move
             double[] boardStateCopy = new double[6 * 64 + 5];
             for(int j = 0; j < 6; j++) 
-            {
+            {   
+                ulong whiteBitboard = board.GetPieceBitboard((PieceType)j, true);
+                ulong blackBitboard = board.GetPieceBitboard((PieceType)j, false);
                 for(int k = 0; k < 64; k++) 
                 {
                     int index = j * 64 + k;
-                    boardStateCopy[index] += (double)((board.GetPieceBitboard((PieceType)j, true) >> k) & 1);
-                    boardStateCopy[index] -= (double)((board.GetPieceBitboard((PieceType)j, false) >> k) & 1);
+                    boardStateCopy[index] += (double)((whiteBitboard >> k) & 1);
+                    boardStateCopy[index] -= (double)((blackBitboard >> k) & 1);
                 }
             }
             boardStateCopy[6 * 64] = board.IsWhiteToMove ? 1f : 0;
