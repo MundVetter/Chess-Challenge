@@ -48,6 +48,10 @@ public class MyBot : IChessBot
             // Make the move on the copy
             board.MakeMove(moves[i]);
             // Get the board state after the move
+            if (board.IsInCheckmate()) {
+                return moves[i];
+            }
+
             double[] boardStateCopy = new double[6 * 64 + 5];
             for(int j = 0; j < 6; j++) 
             {   
