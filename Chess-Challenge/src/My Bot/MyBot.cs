@@ -8,9 +8,10 @@ public class MyBot : IChessBot
 {
     private double[][][] fc_weights;
     private double[][] fc_biases, embedding;
+    private NeuralNetwork nn;
     public Move Think(Board board, Timer timer)
     {
-        if (fc_weights == null)
+        if (nn == null)
         {
             fc_weights = new double[4][][];
             fc_biases = new double[4][];
@@ -30,59 +31,36 @@ public class MyBot : IChessBot
             fc_biases[2] = LoadParams(new string[] { nameof(b6__Caxbi919ubTb19V9naL9p_7_U9d9L9Baa9A9abBb29h9acb_ObO9e9K9EbD__9P) }, 32, 28, 160.403076171875);
             int w7__W_4aa_2_Q9ybs9p9M_K_w9c__bi_4_FbN9J_b_59eb0_V_V9j9Q_BbS9H90b89r;
             fc_weights[3] = LoadParams(new string[] { nameof(w7__W_4aa_2_Q9ybs9p9M_K_w9c__bi_4_FbN9J_b_59eb0_V_V9j9Q_BbS9H90b89r) }, 1, 32, 62, 566.7643432617188);
+
+            nn = new NeuralNetwork(fc_weights, fc_biases, embedding);
         }
-        Move[] moves = board.GetLegalMoves();
-        // // get who's turn it is
-        int flip = board.IsWhiteToMove ? -1 : 1;
+        // Move[] moves = board.GetLegalMoves();
+        // // // get who's turn it is
+        // int flip = board.IsWhiteToMove ? -1 : 1;
 
-        // double[] scores = new double[moves.Length];
-        // // loop over all legal moves
-        // for (int i = 0; i < moves.Length; i++)
-        // {
-        //     // Make the move on the copys
-        //     board.MakeMove(moves[i]);
-        //     // Get the board state after the move
-        //     if (board.IsInCheckmate()) return moves[i];
+        // // double[] scores = new double[moves.Length];
+        // // // loop over all legal moves
+        // // for (int i = 0; i < moves.Length; i++)
+        // // {
+        // //     // Make the move on the copys
+        // //     board.MakeMove(moves[i]);
+        // //     // Get the board state after the move
+        // //     if (board.IsInCheckmate()) return moves[i];
 
-        //     // Feed the board state to the network
-        //     double[] output = FeedForward(GetBoardState(board, embedding));
-        //     // Get the score for the move
+        // //     // Feed the board state to the network
+        // //     double[] output = FeedForward(GetBoardState(board, embedding));
+        // //     // Get the score for the move
 
-        //     scores[i] = output[0] * flip;
+        // //     scores[i] = output[0] * flip;
 
-        //     // Undo the move
-        //     board.UndoMove(moves[i]);
-        // }
+        // //     // Undo the move
+        // //     board.UndoMove(moves[i]);
+        // // }
 
-        // // play the move with the highest score using max
-        // return moves[scores.ToList().IndexOf(scores.Max())];
-
-    }
-    public double[] GetBoardState(Board board, double[][] embedding)
-    {
-        //64 * 4 + 5
-        double[] boardStateCopy, e;
-        boardStateCopy = new double[261];
-        for (int i = 0; i < 64; i++)
-        {
-            e = embedding[PieceToInt(board.GetPiece(new Square(i)))];
-            // embedding size is 4
-            for (int j = 0; j < 4; j++)
-                boardStateCopy[j * 64 + i] = e[j];
-        }
-
-        // 64 * 4;
-        boardStateCopy[256] = board.IsWhiteToMove ? 1.0 : 0.0;
-        boardStateCopy[257] = board.HasKingsideCastleRight(true) ? 1.0 : 0.0;
-        boardStateCopy[258] = board.HasQueensideCastleRight(true) ? 1.0 : 0.0;
-        boardStateCopy[259] = board.HasKingsideCastleRight(false) ? 1.0 : 0.0;
-        boardStateCopy[260] = board.HasQueensideCastleRight(false) ? 1.0 : 0.0;
-
-        return boardStateCopy;
-    }
-    public int PieceToInt(Piece piece)
-    {
-        return (piece == null) ? 0 : piece.IsWhite ? (int)piece.PieceType : (int)piece.PieceType + 6;
+        // // // play the move with the highest score using max
+        // // return moves[scores.ToList().IndexOf(scores.Max())];
+        MonteCarloTreeSearchNode root = new MonteCarloTreeSearchNode(board, nn, new Move());
+        return root.BestAction(1000);
     }
 
     public delegate void AssignValueAction(int index, double value);
@@ -126,6 +104,20 @@ public class MyBot : IChessBot
         return result;
     }
 
+
+}
+
+public class NeuralNetwork
+{
+    private double[][][] fc_weights;
+    private double[][] fc_biases, embedding;
+
+    public NeuralNetwork(double[][][] fc_weights, double[][] fc_biases, double[][] embedding)
+    {
+        this.fc_weights = fc_weights;
+        this.fc_biases = fc_biases;
+        this.embedding = embedding;
+    }
     public double[] FeedForward(double[] input)
     {
         int i, j, k;
@@ -144,7 +136,31 @@ public class MyBot : IChessBot
         }
         return input;
     }
+    public double forward(Board board)
+    {
+        double[] boardStateCopy, e;
+        boardStateCopy = new double[261];
+        for (int i = 0; i < 64; i++)
+        {
+            Piece piece = board.GetPiece(new Square(i));
+            e = embedding[(piece == null) ? 0 : piece.IsWhite ? (int)piece.PieceType : (int)piece.PieceType + 6];
+            // embedding size is 4
+            for (int j = 0; j < 4; j++)
+                boardStateCopy[j * 64 + i] = e[j];
+        }
+
+        // 64 * 4;
+        boardStateCopy[256] = board.IsWhiteToMove ? 1.0 : 0.0;
+        boardStateCopy[257] = board.HasKingsideCastleRight(true) ? 1.0 : 0.0;
+        boardStateCopy[258] = board.HasQueensideCastleRight(true) ? 1.0 : 0.0;
+        boardStateCopy[259] = board.HasKingsideCastleRight(false) ? 1.0 : 0.0;
+        boardStateCopy[260] = board.HasQueensideCastleRight(false) ? 1.0 : 0.0;
+
+        int turn = (board.IsWhiteToMove ? -1 : 1);
+        return FeedForward(boardStateCopy)[0] * turn;
+    }
 }
+
 public class MonteCarloTreeSearchNode
 {
     public Board State { get; private set; }
@@ -156,20 +172,20 @@ public class MonteCarloTreeSearchNode
     private List<Move> untriedActions;
 
     private double totalValue = 0;  // Total value of this node
-    private Embedding embedding;  // The network to evaluate board states
+    private NeuralNetwork nn;
 
-    public MonteCarloTreeSearchNode(Board state, Embedding embedding, MonteCarloTreeSearchNode parent = null, Move parentAction = null, )
+    public MonteCarloTreeSearchNode(Board state, NeuralNetwork nn,  Move parentAction, MonteCarloTreeSearchNode parent = null)
     {
         this.State = state;
         this.Parent = parent;
         this.ParentAction = parentAction;
-        this.embedding = embedding;
         this.untriedActions = new List<Move>(state.GetLegalMoves());
+        this.nn = nn;
     }
 
     public double Q()
     {
-        return wins;
+        return totalValue / numberOfVisits;
     }
 
     public int N()
@@ -182,7 +198,7 @@ public class MonteCarloTreeSearchNode
         Move action = untriedActions[untriedActions.Count - 1];
         untriedActions.RemoveAt(untriedActions.Count - 1);
         State.MakeMove(action);
-        MonteCarloTreeSearchNode child = new MonteCarloTreeSearchNode(State, this, action);
+        MonteCarloTreeSearchNode child = new MonteCarloTreeSearchNode(State, this.nn,  action, this);
         Children.Add(child);
         State.UndoMove(action);
         return child;
@@ -194,18 +210,9 @@ public class MonteCarloTreeSearchNode
     }
 
     public double Rollout()
-    {
-        while (!State.IsInCheckmate() && !State.IsDraw())
         {
-            Move[] possibleMoves = State.GetLegalMoves();
-            // # use 
-            Move action = possibleMoves[new Random().Next(possibleMoves.Length)];
-            State.MakeMove(action);
+            return nn.forward(State); // Assuming the network's output is the value of the state
         }
-        double result = State.IsDraw() && !State.IsWhiteToMove ? 1.0 : 0.0;
-        UndoMovesToOriginalState();
-        return result;
-    }
 
     private void UndoMovesToOriginalState()
     {
@@ -224,11 +231,11 @@ public class MonteCarloTreeSearchNode
 
     public void Backpropagate(double result)
     {
-        numberOfVisits++;
-        wins += result;
+       numberOfVisits++;
+        totalValue += result;
         if (Parent != null)
         {
-            Parent.Backpropagate(1 - result);  // 1 - result because 1 is a win and 0 is a loss
+            Parent.Backpropagate(result);
         }
     }
 
