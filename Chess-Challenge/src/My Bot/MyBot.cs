@@ -38,10 +38,9 @@ fc_weights[3] = LoadParams(new string[] {nameof(w7_dWedaad2dYcGbucwcTdOdFcAd_bke
         if (board.GameMoveHistory.Count() < 3) {
             deepness = 2;
         }
-        if (timer.MillisecondsRemaining < 1000) {
+        if (timer.MillisecondsRemaining < 3000) {
             deepness = 1;
-        }
-        if (board.GetLegalMoves().Length < 10 && timer.MillisecondsRemaining > 10000 && !board.IsInCheck()) {
+        } else if (board.GetLegalMoves().Length < 10 && timer.MillisecondsRemaining > 10000 && !board.IsInCheck()) {
             deepness += 1;
         }
 
@@ -53,65 +52,31 @@ public (Move, double) Minimax(Board board, int depth, bool maximizingPlayer, int
 {
     Move[] moves = board.GetLegalMoves();
 
-    // If depth is 0 or node is a terminal node.
     if (depth == 0 || moves.Length == 0)
     {
-        double value;
-        if (board.IsInCheckmate())
-        {
-            int winner = board.IsWhiteToMove ? -1 : 1;
-            value = double.PositiveInfinity * winner;;
-        }
-        else if (board.IsDraw())
-        {
-            value = 0;
-        }
-        else
-        {
-            value = nn.forward(board) * white;
-        }
-        return (new Move(), value);
+        return (new Move(), board.IsInCheckmate() 
+            ? double.PositiveInfinity * (board.IsWhiteToMove ? -1 : 1)
+            : board.IsDraw() ? 0 
+            : nn.forward(board) * white);
     }
 
     Move bestMove = new Move();
-    if (maximizingPlayer)
+    double value = maximizingPlayer ? double.NegativeInfinity : double.PositiveInfinity;
+
+    foreach (Move move in moves)
     {
-        double value = double.NegativeInfinity;
+        board.MakeMove(move);
+        (_, double childValue) = Minimax(board, depth - 1, !maximizingPlayer, white);
+        board.UndoMove(move);
 
-        foreach (Move move in moves)
+        if ((maximizingPlayer && childValue > value) || (!maximizingPlayer && childValue < value))
         {
-            board.MakeMove(move);
-            (_, double childValue) = Minimax(board, depth - 1, false, white);
-            board.UndoMove(move);
-
-            if (childValue > value)
-            {
-                value = childValue;
-                bestMove = move;
-            }
+            value = childValue;
+            bestMove = move;
         }
-
-        return (bestMove, value);
     }
-    else // minimizing player
-    {
-        double value = double.PositiveInfinity;
 
-        foreach (Move move in moves)
-        {
-            board.MakeMove(move);
-            (_, double childValue) = Minimax(board, depth - 1, true, white);
-            board.UndoMove(move);
-
-            if (childValue < value)
-            {
-                value = childValue;
-                bestMove = move;
-            }
-        }
-
-        return (bestMove, value);
-    }
+    return (bestMove, value);
 }
 
     public delegate void AssignValueAction(int index, double value);
